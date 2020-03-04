@@ -7,14 +7,15 @@ import datetime
 import hashlib
 from random import randint
 from django.views.decorators.csrf import csrf_protect, csrf_exempt
-from django.core.context_processors import csrf
+# from django.core.context_processors import csrf
 
 def index(request):
+    # return render(request, "test.html")
     return render(request, "test.html")
 
 def Home(request): 
     MERCHANT_KEY = "P2zYe5F3"
-    key=""
+    key="P2zYe5F3"
     SALT = "MWEhWKLvfU"
     PAYU_BASE_URL = "https://sandboxsecure.payu.in/_payment"
     action = ''
@@ -24,7 +25,6 @@ def Home(request):
         posted[i]=request.POST[i]
     hash_object = hashlib.sha256(b'randint(0,20)')
     txnid=hash_object.hexdigest()[0:20]
-    hashh = ''
     posted['txnid']=txnid
     hashSequence = "key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5|udf6|udf7|udf8|udf9|udf10"
     posted['key']=key
@@ -37,15 +37,15 @@ def Home(request):
             hash_string+=''
         hash_string+='|'
     hash_string+=SALT
-    hashh=hashlib.sha512(hash_string).hexdigest().lower()
+    # hashh=hashlib.sha512(hash_string).hexdigest().lower()
+    hashh=hashlib.sha512(hash_string.encode('utf-8')).hexdigest().lower()
     action =PAYU_BASE_URL
     if(posted.get("key")!=None and posted.get("txnid")!=None and posted.get("productinfo")!=None and posted.get("firstname")!=None and posted.get("email")!=None):
         # return render_to_response('current_datetime.html',RequestContext(request,{"posted":posted,"hashh":hashh,"MERCHANT_KEY":MERCHANT_KEY,"txnid":txnid,"hash_string":hash_string,"action":"https://test.payu.in/_payment" }))
-        return render('current_datetime.html',RequestContext(request,{"posted":posted,"hashh":hashh,"MERCHANT_KEY":MERCHANT_KEY,"txnid":txnid,"hash_string":hash_string,"action":"https://test.payu.in/_payment" }))
+        return render(request, 'current_datetime.html',{"posted":posted,"hashh":hashh,"MERCHANT_KEY":MERCHANT_KEY,"txnid":txnid,"hash_string":hash_string,"action":"https://test.payu.in/_payment" })
     else:
         # return render_to_response('current_datetime.html',RequestContext(request,{"posted":posted,"hashh":hashh,"MERCHANT_KEY":MERCHANT_KEY,"txnid":txnid,"hash_string":hash_string,"action":"." }))
-        return render('current_datetime.html',RequestContext(request,{"posted":posted,"hashh":hashh,"MERCHANT_KEY":MERCHANT_KEY,"txnid":txnid,"hash_string":hash_string,"action":"." }))
-
+        return render(request, 'current_datetime.html',{"posted":posted,"hashh":hashh,"MERCHANT_KEY":MERCHANT_KEY,"txnid":txnid,"hash_string":hash_string,"action":"." })
 @csrf_protect
 @csrf_exempt
 def success(request):
@@ -72,12 +72,12 @@ def success(request):
         print("Thank You. Your order status is ", status)
         print("Your Transaction ID for this transaction is ",txnid)
         print("We have received a payment of Rs. ", amount ,". Your order will soon be shipped.")
-    # return render_to_response('sucess.html',RequestContext(request,{"txnid":txnid,"status":status,"amount":amount}))
-    return render('sucess.html',RequestContext(request,{"txnid":txnid,"status":status,"amount":amount}))
+    # return render_to_response('success.html',RequestContext(request,{"txnid":txnid,"status":status,"amount":amount}))
+    return render(request,'success.html',{"txnid":txnid,"status":status,"amount":amount})
 
 
-# @csrf_protect
-# @csrf_exempt
+@csrf_protect
+@csrf_exempt
 def failure(request):
     c = {}
     c.update(csrf(request))
@@ -103,7 +103,7 @@ def failure(request):
         print("Your Transaction ID for this transaction is ",txnid)
         print("We have received a payment of Rs. ", amount ,". Your order will soon be shipped.")
     # return render_to_response("failure.html",RequestContext(request,c))
-    return render("failure.html",RequestContext(request,c))
+    return render(request,"failure.html", c)
 
     
 
