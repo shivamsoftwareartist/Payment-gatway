@@ -1,109 +1,112 @@
-# from django.shortcuts import render, render_to_response
 from django.shortcuts import render
-from django.http import HttpResponse,HttpResponseRedirect
-from django.template.loader import get_template
-from django.template import Context, Template,RequestContext
-import datetime
-import hashlib
-from random import randint
-from django.views.decorators.csrf import csrf_protect, csrf_exempt
-# from django.core.context_processors import csrf
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 
-def index(request):
+from paywix.payu import PAYU
+import uuid
+
+
+def home(request):
     # return render(request, "test.html")
     return render(request, "test.html")
 
-def Home(request): 
-    MERCHANT_KEY = "P2zYe5F3"
-    key="P2zYe5F3"
-    SALT = "MWEhWKLvfU"
-    PAYU_BASE_URL = "https://sandboxsecure.payu.in/_payment"
-    action = ''
-    posted={}
-    # Merchant Key and Salt provided y the PayU.
-    for i in request.POST:
-        posted[i]=request.POST[i]
-    hash_object = hashlib.sha256(b'randint(0,20)')
-    txnid=hash_object.hexdigest()[0:20]
-    posted['txnid']=txnid
-    hashSequence = "key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5|udf6|udf7|udf8|udf9|udf10"
-    posted['key']=key
-    hash_string=''
-    hashVarsSeq=hashSequence.split('|')
-    for i in hashVarsSeq:
-        try:
-            hash_string+=str(posted[i])
-        except Exception:
-            hash_string+=''
-        hash_string+='|'
-    hash_string+=SALT
-    # hashh=hashlib.sha512(hash_string).hexdigest().lower()
-    hashh=hashlib.sha512(hash_string.encode('utf-8')).hexdigest().lower()
-    action =PAYU_BASE_URL
-    if(posted.get("key")!=None and posted.get("txnid")!=None and posted.get("productinfo")!=None and posted.get("firstname")!=None and posted.get("email")!=None):
-        # return render_to_response('current_datetime.html',RequestContext(request,{"posted":posted,"hashh":hashh,"MERCHANT_KEY":MERCHANT_KEY,"txnid":txnid,"hash_string":hash_string,"action":"https://test.payu.in/_payment" }))
-        return render(request, 'current_datetime.html',{"posted":posted,"hashh":hashh,"MERCHANT_KEY":MERCHANT_KEY,"txnid":txnid,"hash_string":hash_string,"action":"https://test.payu.in/_payment" })
-    else:
-        # return render_to_response('current_datetime.html',RequestContext(request,{"posted":posted,"hashh":hashh,"MERCHANT_KEY":MERCHANT_KEY,"txnid":txnid,"hash_string":hash_string,"action":"." }))
-        return render(request, 'current_datetime.html',{"posted":posted,"hashh":hashh,"MERCHANT_KEY":MERCHANT_KEY,"txnid":txnid,"hash_string":hash_string,"action":"." })
-@csrf_protect
+payu = PAYU()
+
+# Payu checkout page
 @csrf_exempt
-def success(request):
-    c = {}
-    c.update(csrf(request))
-    status=request.POST["status"]
-    firstname=request.POST["firstname"]
-    amount=request.POST["amount"]
-    txnid=request.POST["txnid"]
-    posted_hash=request.POST["hash"]
-    key=request.POST["key"]
-    productinfo=request.POST["productinfo"]
-    email=request.POST["email"]
-    salt="GQs7yium"
-    try:
-        additionalCharges=request.POST["additionalCharges"]
-        retHashSeq=additionalCharges+'|'+salt+'|'+status+'|||||||||||'+email+'|'+firstname+'|'+productinfo+'|'+amount+'|'+txnid+'|'+key
-    except Exception:
-        retHashSeq = salt+'|'+status+'|||||||||||'+email+'|'+firstname+'|'+productinfo+'|'+amount+'|'+txnid+'|'+key
-    hashh=hashlib.sha512(retHashSeq).hexdigest().lower()
-    if(hashh !=posted_hash):
-        print("Invalid Transaction. Please try again")
-    else:
-        print("Thank You. Your order status is ", status)
-        print("Your Transaction ID for this transaction is ",txnid)
-        print("We have received a payment of Rs. ", amount ,". Your order will soon be shipped.")
-    # return render_to_response('success.html',RequestContext(request,{"txnid":txnid,"status":status,"amount":amount}))
-    return render(request,'success.html',{"txnid":txnid,"status":status,"amount":amount})
+def payu_checkout(request):
+    if request.method == 'POST':
+        data = dict(zip(request.POST.keys(), request.POST.values()))
+        data['txnid'] = payu.generate_txnid()
+        payu_data = payu.initiate_transaction(data)
+        # return render(request, 'payu_checkout.html', {"posted": payu_data})
+        return render(request, 'success.html', {"posted": payu_data})
+    return render(request, 'payu.html', {})
 
 
-@csrf_protect
+# Payu success return page
 @csrf_exempt
-def failure(request):
-    c = {}
-    c.update(csrf(request))
-    status=request.POST["status"]
-    firstname=request.POST["firstname"]
-    amount=request.POST["amount"]
-    txnid=request.POST["txnid"]
-    posted_hash=request.POST["hash"]
-    key=request.POST["key"]
-    productinfo=request.POST["productinfo"]
-    email=request.POST["email"]
-    salt=""
-    try:
-        additionalCharges=request.POST["additionalCharges"]
-        retHashSeq=additionalCharges+'|'+salt+'|'+status+'|||||||||||'+email+'|'+firstname+'|'+productinfo+'|'+amount+'|'+txnid+'|'+key
-    except Exception:
-        retHashSeq = salt+'|'+status+'|||||||||||'+email+'|'+firstname+'|'+productinfo+'|'+amount+'|'+txnid+'|'+key
-    hashh=hashlib.sha512(retHashSeq).hexdigest().lower()
-    if(hashh !=posted_hash):
-        print("Invalid Transaction. Please try again")
-    else:
-        print("Thank You. Your order status is ", status)
-        print("Your Transaction ID for this transaction is ",txnid)
-        print("We have received a payment of Rs. ", amount ,". Your order will soon be shipped.")
-    # return render_to_response("failure.html",RequestContext(request,c))
-    return render(request,"failure.html", c)
+def payu_success(request):
+    data = dict(zip(request.POST.keys(), request.POST.values()))
+    response = payu.check_hash(data)
+    return JsonResponse(response)
 
-    
+
+# Payu failure page
+@csrf_exempt
+def payu_failure(request):
+    data = dict(zip(request.POST.keys(), request.POST.values()))
+    response = payu.check_hash(data)
+    return JsonResponse(response)    
+
+# def checkout(request):
+#     if request.method == 'POST':
+#         data = {'amount': '10', 
+#                 'firstname': 'renjith', 
+#                 'email': 'sraj@gmail.com',
+#                 'phone': '9746272610', 'productinfo': 'test', 
+#                 'lastname': 'test', 'address1': 'test', 
+#                 'address2': 'test', 'city': 'test', 
+#                 'state': 'test', 'country': 'test', 
+#                 'zipcode': 'tes', 'udf1': '', 
+#                 'udf2': '', 'udf3': '', 'udf4': '', 'udf5': ''
+#             }
+#         # You can generate the transaction id, save to db
+#         # Here paywix.payu providing dynamic transaction id's 
+#         # if  you this method please ensure that, the ID is not existed in the
+#         # db
+#         data['txnid'] = payu.generate_txnid()
+#         # Please dont forget to include this part, The paywix.payu included the hidden
+#         # Payu form, will post the data to payu based on your mode selection, if you
+#         # required more detils please go through : 
+#         # https://github.com/renjithsraj/paywix/blob/master/paywix/templates/payu_checkout.html
+#         payu_data = payu.initiate_transaction(data)
+#         return render(request, 'payu_checkout.html', {"posted": payu_data})
+#     else:
+#         return render(request, 'checkout.html', {"posted": payu_data})
+
+
+# Payu success return page
+# @csrf_exempt
+# def payu_success(request):
+#     data = dict(zip(request.POST.keys(), request.POST.values()))
+#     response = payu.check_hash(data)
+#     # Store response to the db
+#     return JsonResponse(response)        
+
+# from django.http import HttpResponse
+# from payu.gateway import check_hash
+# from payment_gateway.settings import *
+# from payu.gateway import payu_url
+# from hashlib import sha512
+# from payu.gateway import get_hash
+# from uuid import uuid4
+# from payu.gateway import verify_payment
+
+
+# payu_url = payu_url()
+# sha512(key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||<SALT>)
+
+
+# data = {
+#     'txnid':uuid4().hex, 'amount':10.00, 'productinfo': 'Sample Product',
+#     'firstname': 'test', 'email': 'test@example.com', 'udf1': 'Userdefined field',
+# }
+# hash_value = get_hash(data)
+
+# sha512(<SALT>|status||||||udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key)
+
+
+
+
+# def success_response(request):
+#     hash_value = check_hash(request.POST)
+#     if check_hash(request.POST):
+#         return HttpResponse("Transaction has been Successful.")
+
+
+
+
+# response = verify_payment("Your txnid")
+# print response       
 

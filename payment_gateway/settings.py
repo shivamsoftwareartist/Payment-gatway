@@ -37,6 +37,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'PaymentGateway',
+    'paywix',
 ]
 
 MIDDLEWARE = [
@@ -118,3 +120,22 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
 
 STATIC_URL = '/static/'
+
+
+#PayU payment gateway
+ # Manadatory Config details
+PAYU_CONFIG = {
+    "merchant_key": "P2zYe5F3",
+    "merchant_salt": "MWEhWKLvfU",
+    # Change the mode to 'LIVE' for production.
+    "mode": "TEST",
+    "success_url": "http://127.0.0.1:8000/payment/success",
+    "failure_url": "http://127.0.0.1:8000/payment/failure"
+}
+
+# PAYU_MERCHANT_KEY = "P2zYe5F3",
+
+# PAYU_MERCHANT_SALT = "MWEhWKLvfU",
+
+# Change the PAYU_MODE to 'LIVE' for production.
+# PAYU_MODE = "TEST"
